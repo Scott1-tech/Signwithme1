@@ -9,6 +9,45 @@ equally to a machine you own.
 
 ---
 
+## No terminal on your own computer?
+
+You do not need one. Everything below can be done from a browser — Google Cloud
+provides two terminals of its own, and neither installs anything locally.
+
+**Cloud Shell** — a Linux shell in a browser tab, used here only to create the
+VM. Open <https://console.cloud.google.com> and click the **`>_`** icon in the
+top-right toolbar. It takes a few seconds to start, then behaves like any
+terminal.
+
+**Browser SSH** — a terminal *on the VM itself*, used for everything after that.
+In the Console go to **Compute Engine → VM instances** and click the **SSH**
+button on the instance's row. A new window opens, already logged in.
+
+If you would rather not type the `gcloud` command in Stage 1 at all, create the
+instance from the Console forms instead:
+
+> **Compute Engine → VM instances → Create instance**
+> * **Name:** `signwithme`
+> * **Region:** `us-central1` · **Zone:** `us-central1-a`
+> * **Machine configuration:** series **E2**, machine type **e2-micro**
+> * **Boot disk → Change:** Debian 12, **Standard persistent disk**, **30 GB**
+> * **Firewall:** leave *Allow HTTP traffic* and *Allow HTTPS traffic*
+>   **unchecked** — the app is reached over Tailscale, not the open internet
+> * **Create**
+
+Then click **SSH** on the new instance and carry on from Stage 2. Every command
+from that point runs in that browser window.
+
+**Two things worth knowing in browser SSH:**
+* **Pasting:** `Ctrl+V` works, as does right-click → Paste. To paste a long
+  command, use the gear icon (top right of the SSH window) if the keyboard
+  shortcut is intercepted.
+* **Editing `.env` with `nano`:** arrow keys to move, type normally, then
+  **`Ctrl+O`** → **`Enter`** to save, **`Ctrl+X`** to exit. There is no mouse
+  cursor placement — use the arrow keys.
+
+---
+
 ## What you need first
 
 | | |
@@ -18,12 +57,14 @@ equally to a machine you own.
 | Your real template | the blank `CFT_ CD.pdf`, for Stage 6 |
 | A test contract | one filled-in copy, ideally with a known mistake in it |
 | ~40 minutes | most of it waiting on the first image build |
+| A browser | that is genuinely all — see the section above |
 
 ---
 
 ## Stage 1 — Create the instance
 
-Run from your own computer, not the VM.
+Run this in **Cloud Shell** (the `>_` icon in the Console toolbar), or use the
+Console form described at the top of this document.
 
 ```bash
 gcloud compute instances create signwithme \
@@ -44,9 +85,10 @@ over a private network in Stage 5.
 
 ## Stage 2 — Prepare the machine
 
-```bash
-gcloud compute ssh signwithme --zone=us-central1-a
+Click **SSH** next to the instance in the Console — or run
+`gcloud compute ssh signwithme --zone=us-central1-a` from Cloud Shell.
 
+```bash
 sudo apt-get update -qq && sudo apt-get install -y -qq git
 git clone <your-repo-url> && cd Signwithme1
 bash scripts/gcp-setup.sh
@@ -58,10 +100,9 @@ is not optional on a 1 GB machine: without it the frontend image build is
 OOM-killed part-way through and presents as an unexplained hang.
 
 Log out and back in — the `docker` group membership only applies to a new
-session.
+session. In browser SSH, close the window and click **SSH** again.
 
 ```bash
-gcloud compute ssh signwithme --zone=us-central1-a
 cd Signwithme1
 ```
 
@@ -140,8 +181,8 @@ curl -fsSL https://tailscale.com/install.sh | sh
 sudo tailscale up --ssh
 ```
 
-Install Tailscale on your laptop and phone under the same account, then open
-`http://signwithme:3000`.
+Follow the printed link to authorise the machine, then install Tailscale on your
+laptop and phone under the same account and open `http://signwithme:3000`.
 
 The app stays bound to loopback on the VM. Nothing is published to the internet,
 there is no certificate to manage, and access is controlled by which devices are
@@ -236,10 +277,15 @@ a fresh contract.
 Then copy them off the machine — a 30 GB boot disk holding the app *and* its
 only backup is not a backup:
 
+From **Cloud Shell**:
+
 ```bash
 gcloud compute scp --recurse --zone=us-central1-a \
-  signwithme:~/Signwithme1/backups/<timestamp> ./local-backups/
+  signwithme:~/Signwithme1/backups/<timestamp> ~/local-backups/
 ```
+
+Then use the Cloud Shell **⋮ → Download** menu to pull the files onto your own
+computer through the browser.
 
 **Restore is documented** in each backup's `RESTORE.md`. Test it once now, while
 nothing depends on it working.

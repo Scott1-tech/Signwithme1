@@ -230,7 +230,8 @@ hostname.
 > **Putting it into service for the first time?** Follow
 > [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) — a staged runbook with a check at
 > the end of each step, including the template-validation stage that has to pass
-> before the system handles anything real.
+> before the system handles anything real. No terminal on your own machine is
+> needed; the runbook opens with the browser-only path.
 
 ### Deploying to a Google Cloud e2-micro (free tier)
 
