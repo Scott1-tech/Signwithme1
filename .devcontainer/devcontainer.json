@@ -1,0 +1,46 @@
+{
+  "name": "Contract Signing App",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu-22.04",
+
+  // Docker-in-Docker: the whole compose stack runs inside the codespace, so
+  // nothing is installed on the user's own computer.
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {
+      "version": "latest",
+      "moby": true
+    }
+  },
+
+  // The smallest machine type. Larger ones work but consume the monthly
+  // free allowance twice as fast.
+  "hostRequirements": {
+    "cpus": 2,
+    "storage": "32gb"
+  },
+
+  "forwardPorts": [3000, 8000],
+  "portsAttributes": {
+    "3000": {
+      "label": "Contract Signing UI",
+      "onAutoForward": "notify"
+    },
+    "8000": {
+      "label": "API",
+      "onAutoForward": "silent"
+    }
+  },
+
+  // Generates .env with fresh secrets on first creation. Deliberately does not
+  // start the stack: the build takes several minutes and is better run where
+  // its output is visible.
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-azuretools.vscode-docker"
+      ]
+    }
+  }
+}

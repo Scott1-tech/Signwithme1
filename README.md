@@ -230,14 +230,17 @@ hostname.
 > **Putting it into service for the first time?** Two staged runbooks, each with
 > a check at the end of every step:
 >
+> * [`docs/DEPLOYMENT-CODESPACES.md`](docs/DEPLOYMENT-CODESPACES.md) — entirely in
+>   a browser, via GitHub Codespaces. Nothing to install, no card, free tier. Good
+>   for using and validating the app; not a 24/7 server.
 > * [`docs/DEPLOYMENT-WINDOWS.md`](docs/DEPLOYMENT-WINDOWS.md) — a Windows PC via
 >   WSL2 and Docker Desktop. No cloud account, no billing, no monthly cost, and
 >   the documents never leave your machine.
 > * [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) — a Google Cloud e2-micro. Opens
 >   with the browser-only path, so no local terminal is needed.
 >
-> Both include the template-validation stage that has to pass before the system
-> handles anything real.
+> All three include the template-validation stage that has to pass before the
+> system handles anything real.
 
 ### Deploying to a Google Cloud e2-micro (free tier)
 

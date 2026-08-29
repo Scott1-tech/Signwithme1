@@ -14,3 +14,6 @@ dist/
 *.local
 .DS_Store
 *.tsbuildinfo
+
+# Generated on first start in a codespace
+CREDENTIALS.txt
