@@ -18,7 +18,12 @@ COPY . .
 
 # The app never needs to write to its own image; running as root would hand an
 # RCE in a PDF library full control of the container.
-RUN useradd --create-home --uid 10001 appuser && chown -R appuser:appuser /app
+# The local storage backend writes here. Creating it in the image with the right
+# owner means a named volume mounted over it inherits that ownership, so the
+# non-root process can write to it.
+RUN useradd --create-home --uid 10001 appuser \
+    && mkdir -p /data/storage \
+    && chown -R appuser:appuser /app /data
 USER appuser
 
 EXPOSE 8000

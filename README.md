@@ -14,7 +14,7 @@ canvas, and rendered into a final PDF with a full audit trail.
 | Frontend | React 18, TypeScript, Vite, pdf.js |
 | Backend | FastAPI, SQLAlchemy 2.0, Alembic, Pydantic v2 |
 | Workers | Celery + Redis |
-| Data | PostgreSQL 15 (JSONB field schemas), MinIO / S3 |
+| Data | PostgreSQL 15 (JSONB field schemas), filesystem or MinIO/S3 |
 
 ## Running it
 
@@ -74,7 +74,7 @@ npm run dev
 ### Tests
 
 ```bash
-cd backend && python -m pytest -q      # 80 tests
+cd backend && python -m pytest -q      # 87 tests
 cd frontend && npm run typecheck && npm run build
 ```
 
@@ -180,12 +180,20 @@ The parser checks the text layer first and fails the document with an explicit
 
 ### Integrity and access
 
-Every artefact (template, upload, signature image, final PDF) lives in object
-storage, hashed with SHA-256. `GET /api/download/{id}/verify` re-hashes the
-stored document and compares it with what was recorded at signing. Downloads
-require an authenticated, authorised caller; the underlying object is reached
-through a short-lived presigned URL, never a stable public path — these
-documents contain SSNs and licence numbers.
+Every artefact (template, upload, signature image, final PDF) is hashed with
+SHA-256 when stored. `GET /api/download/{id}/verify` re-hashes the stored
+document and compares it with what was recorded at signing.
+
+Files are always served **through the API**, never by a link into the storage
+layer. That keeps one authorisation check on every read, and it means the object
+store never has to be reachable from a browser — a presigned URL pointing at an
+internal host is unreachable, and one pointing at a public host bypasses
+authorisation entirely.
+
+Storage has two interchangeable backends, chosen with `STORAGE_BACKEND`:
+`local` writes to a mounted volume (the default, and what small hosts should
+use), `s3` talks to MinIO or Amazon S3. MinIO is behind a compose profile, so it
+only runs when asked for: `docker compose --profile s3 up -d`.
 
 ## Schema notes
 
@@ -218,6 +226,80 @@ attack surface, with no certificate to manage. If you do publish it, put it
 behind a reverse proxy that terminates TLS (Caddy gets you a certificate
 automatically), set `FRONTEND_BIND=0.0.0.0`, and set `CORS_ORIGINS` to your real
 hostname.
+
+### Deploying to a Google Cloud e2-micro (free tier)
+
+e2-micro is a shared-core machine with **1 GB of RAM**, so the stack is
+configured to fit rather than merely to start. `docker-compose.gcp.yml` caps
+each service, drops every worker count to 1, and tunes Postgres down from
+defaults sized for a much larger machine. Storage stays on the filesystem —
+MinIO idles at a few hundred megabytes, a quarter of the machine, for no benefit
+at this scale.
+
+**1. Create the instance** (from your own machine):
+
+```bash
+gcloud compute instances create signwithme \
+  --zone=us-central1-a \
+  --machine-type=e2-micro \
+  --image-family=debian-12 --image-project=debian-cloud \
+  --boot-disk-size=30GB --boot-disk-type=pd-standard
+```
+
+The free tier covers one e2-micro in `us-west1`, `us-central1` or `us-east1`,
+with a 30 GB **standard** persistent disk. A balanced or larger disk, or any
+other zone, is billed.
+
+**2. Prepare it**:
+
+```bash
+gcloud compute ssh signwithme --zone=us-central1-a
+git clone <your repo> && cd Signwithme1
+bash scripts/gcp-setup.sh      # swap, Docker, log caps
+exit                            # log back in for the docker group
+```
+
+Swap is not optional. With 1 GB and no swap the frontend image build is killed
+by the OOM reaper part-way through, which presents as an unexplained hang.
+
+**3. Configure and start**:
+
+```bash
+cp .env.example .env
+python3 -c "import secrets; print(secrets.token_urlsafe(48))"   # JWT_SECRET
+python3 -c "import secrets; print(secrets.token_urlsafe(48))"   # PII_ENCRYPTION_KEY
+# keep STORAGE_BACKEND=local and FRONTEND_BIND=127.0.0.1
+
+docker compose -f docker-compose.yml -f docker-compose.gcp.yml up -d --build
+```
+
+First build is 10–20 minutes on a shared core. Check `free -h` before diagnosing
+a stall as anything other than memory.
+
+**4. Reach it privately** — do *not* open port 3000 to the internet:
+
+```bash
+curl -fsSL https://tailscale.com/install.sh | sh
+sudo tailscale up --ssh
+```
+
+Then browse to `http://signwithme:3000` from any device on your tailnet. The app
+stays bound to loopback, no firewall rule is added, and nothing is exposed.
+
+**What this actually costs.** The compute and the 30 GB standard disk are free.
+The **external IPv4 address is not** — Google has charged for all external IPv4
+since 2024, roughly $3/month for an in-use ephemeral address. Running with
+`--no-address` avoids it but then the VM cannot pull images without Cloud NAT,
+which costs about the same. So budget ~$3/month, or run it on hardware you
+already own for genuinely nothing. The free tier also includes only 1 GB of
+egress per month; downloading signed PDFs counts against that.
+
+**Operational notes for this machine.** Expect a 40-page parse to take
+noticeably longer than on a laptop — the worker is capped at concurrency 1 and
+recycles every 8 tasks, because a long-lived Python process never returns the
+memory a large PDF spikes. Run `scripts/backup.sh` from cron and copy the output
+off the instance; a 30 GB boot disk holding both the app and its only backup is
+not a backup.
 
 ### Known limits of this deployment
 

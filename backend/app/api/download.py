@@ -29,7 +29,6 @@ def download_final(
     request: Request,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
-    redirect: bool = False,
 ):
     contract = get_contract_or_404(db, contract_id)
     assert_can_view_contract(contract, user)
@@ -48,9 +47,6 @@ def download_final(
         commit=True,
     )
 
-    if redirect:
-        return {"url": storage.presigned_url(contract.final_file_path, filename=filename)}
-
     stream = storage.stream(contract.final_file_path)
     return StreamingResponse(
         stream,
@@ -58,6 +54,7 @@ def download_final(
         headers={
             "Content-Disposition": f'attachment; filename="{filename}"',
             "X-Content-SHA256": contract.final_file_hash or "",
+            "Cache-Control": "no-store",
         },
     )
 

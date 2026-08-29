@@ -4,6 +4,7 @@ from __future__ import annotations
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
+from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -110,10 +111,20 @@ def get_template_file(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
+    """Stream the template PDF.
+
+    Served through the API rather than by a link into the storage layer: the
+    same authorisation check then covers every read, and there is no storage
+    endpoint that has to be reachable from a browser.
+    """
     template = get_template_or_404(db, template_id)
     if not template.file_path:
         raise NotFoundError("Template file is not available")
-    return {"url": storage.presigned_url(template.file_path, filename=f"{template.name}.pdf")}
+    return StreamingResponse(
+        storage.stream(template.file_path),
+        media_type="application/pdf",
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 @router.put("/{template_id}/fields/{field_id}")

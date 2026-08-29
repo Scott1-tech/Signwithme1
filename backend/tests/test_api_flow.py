@@ -93,3 +93,14 @@ def test_a_missing_contract_is_a_404_not_a_500(api, contractor_token):
         "/api/contracts/00000000-0000-0000-0000-000000000000", headers=auth(contractor_token)
     )
     assert response.status_code == 404
+
+
+def test_the_contract_pdf_streams_from_the_api(api, contractor_token, uploaded_contract):
+    """The browser must never need to reach the object store directly -- a
+    presigned link to an internal host is unreachable from a browser, and a
+    public one bypasses authorisation."""
+    response = api.get(f"/api/contracts/{uploaded_contract}/file", headers=auth(contractor_token))
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "application/pdf"
+    assert response.content.startswith(b"%PDF-")
+    assert response.headers["cache-control"] == "no-store"

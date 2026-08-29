@@ -25,8 +25,11 @@ services:
       timeout: 3s
       retries: 10
 
+  # Optional. The default storage backend is the filesystem, which costs no
+  # memory at all; start MinIO only with `--profile s3`.
   minio:
     image: minio/minio:latest
+    profiles: ["s3"]
     restart: unless-stopped
     command: server /data --console-address ":9001"
     environment:
@@ -51,9 +54,11 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg2://contract_app:${DB_PASSWORD}@postgres:5432/contracts
       REDIS_URL: redis://redis:6379/0
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
+      STORAGE_DIR: /data/storage
       MINIO_ENDPOINT: minio:9000
-      MINIO_ACCESS_KEY: ${MINIO_USER}
-      MINIO_SECRET_KEY: ${MINIO_PASSWORD}
+      MINIO_ACCESS_KEY: ${MINIO_USER:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_PASSWORD:-minioadmin}
       MINIO_BUCKET: ${MINIO_BUCKET:-contracts}
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
       PII_ENCRYPTION_KEY: ${PII_ENCRYPTION_KEY:-}
@@ -64,11 +69,12 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
-      minio: { condition: service_started }
     ports:
       # Loopback only: nginx in the frontend container proxies /api, so the API
       # does not need to be reachable from the network directly.
       - "127.0.0.1:8000:8000"
+    volumes:
+      - app_storage:/data/storage
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
       interval: 10s
@@ -84,9 +90,11 @@ services:
       REDIS_URL: redis://redis:6379/0
       # The worker is what parses and stores every PDF -- it needs the same
       # object-storage credentials as the API, not just a database URL.
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
+      STORAGE_DIR: /data/storage
       MINIO_ENDPOINT: minio:9000
-      MINIO_ACCESS_KEY: ${MINIO_USER}
-      MINIO_SECRET_KEY: ${MINIO_PASSWORD}
+      MINIO_ACCESS_KEY: ${MINIO_USER:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_PASSWORD:-minioadmin}
       MINIO_BUCKET: ${MINIO_BUCKET:-contracts}
       JWT_SECRET: ${JWT_SECRET}
       PII_ENCRYPTION_KEY: ${PII_ENCRYPTION_KEY:-}
@@ -97,6 +105,8 @@ services:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
       backend: { condition: service_healthy }
+    volumes:
+      - app_storage:/data/storage
 
   frontend:
     build: ./frontend
@@ -109,3 +119,4 @@ services:
 volumes:
   postgres_data:
   minio_data:
+  app_storage:

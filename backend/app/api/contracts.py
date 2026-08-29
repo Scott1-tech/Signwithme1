@@ -4,6 +4,7 @@ from __future__ import annotations
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
+from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -302,8 +303,15 @@ def get_contract_file(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    """Short-lived presigned URL for the original upload. These documents carry
-    SSNs, so the URL expires rather than being a stable public path."""
+    """Stream the original upload.
+
+    These documents carry SSNs, so the bytes travel through an authorised
+    request rather than any link that could be forwarded or cached.
+    """
     contract = get_contract_or_404(db, contract_id)
     assert_can_view_contract(contract, user)
-    return {"url": storage.presigned_url(contract.file_path, filename="contract.pdf")}
+    return StreamingResponse(
+        storage.stream(contract.file_path),
+        media_type="application/pdf",
+        headers={"Cache-Control": "no-store"},
+    )

@@ -18,6 +18,10 @@ class Settings(BaseSettings):
     # Redis / Celery
     redis_url: str = "redis://localhost:6379/0"
 
+    # Object storage. "local" writes to storage_dir; "s3" talks to MinIO or S3.
+    storage_backend: str = "s3"
+    storage_dir: str = "/data/storage"
+
     # Object storage (MinIO / S3)
     minio_endpoint: str = "localhost:9000"
     minio_access_key: str = "minioadmin"

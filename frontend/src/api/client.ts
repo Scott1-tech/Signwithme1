@@ -96,8 +96,13 @@ export const api = {
   upload: <T>(path: string, formData: FormData) => request<T>(path, { method: 'POST', formData }),
 };
 
-/** PDFs are fetched as bytes with the auth header attached; pdf.js cannot send
- *  one itself, and these documents are never publicly readable. */
+/**
+ * Fetch a PDF as bytes with the auth header attached.
+ *
+ * The API streams the document itself rather than handing back a link into the
+ * storage layer, so this is a single authorised request -- and nothing depends
+ * on the object store being reachable from the browser.
+ */
 export async function fetchPdf(path: string): Promise<ArrayBuffer> {
   const token = tokenStore.get();
   const response = await fetch(path, {
@@ -106,10 +111,5 @@ export async function fetchPdf(path: string): Promise<ArrayBuffer> {
   if (!response.ok) {
     throw new ApiError(response.status, 'pdf_fetch_failed', `Could not load PDF (${response.status})`);
   }
-  const { url } = (await response.json()) as { url: string };
-  const file = await fetch(url);
-  if (!file.ok) {
-    throw new ApiError(file.status, 'pdf_fetch_failed', 'Presigned URL rejected');
-  }
-  return file.arrayBuffer();
+  return response.arrayBuffer();
 }
