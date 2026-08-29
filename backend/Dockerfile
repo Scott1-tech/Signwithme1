@@ -16,6 +16,11 @@ RUN pip install -r requirements.txt
 
 COPY . .
 
+# Restore the executable bit: a Windows checkout does not carry file modes into
+# the build context, so without this the entrypoint is copied in unexecutable
+# and the container exits immediately with "permission denied".
+RUN chmod +x /app/entrypoint.sh
+
 # The app never needs to write to its own image; running as root would hand an
 # RCE in a PDF library full control of the container.
 # The local storage backend writes here. Creating it in the image with the right

@@ -1,0 +1,16 @@
+# Shell scripts must keep LF endings even when checked out on Windows.
+#
+# With git's autocrlf enabled, entrypoint.sh arrives with CRLF, the container
+# tries to run an interpreter called "bash\r", and Docker reports
+#   /usr/bin/env: 'bash\r': No such file or directory
+# which gives no hint that line endings are the cause.
+*.sh text eol=lf
+Dockerfile text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+
+# Never rewrite binary content.
+*.pdf binary
+*.png binary
+*.jpg binary
+*.ico binary

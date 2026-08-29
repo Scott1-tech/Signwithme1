@@ -227,11 +227,17 @@ behind a reverse proxy that terminates TLS (Caddy gets you a certificate
 automatically), set `FRONTEND_BIND=0.0.0.0`, and set `CORS_ORIGINS` to your real
 hostname.
 
-> **Putting it into service for the first time?** Follow
-> [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) — a staged runbook with a check at
-> the end of each step, including the template-validation stage that has to pass
-> before the system handles anything real. No terminal on your own machine is
-> needed; the runbook opens with the browser-only path.
+> **Putting it into service for the first time?** Two staged runbooks, each with
+> a check at the end of every step:
+>
+> * [`docs/DEPLOYMENT-WINDOWS.md`](docs/DEPLOYMENT-WINDOWS.md) — a Windows PC via
+>   WSL2 and Docker Desktop. No cloud account, no billing, no monthly cost, and
+>   the documents never leave your machine.
+> * [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) — a Google Cloud e2-micro. Opens
+>   with the browser-only path, so no local terminal is needed.
+>
+> Both include the template-validation stage that has to pass before the system
+> handles anything real.
 
 ### Deploying to a Google Cloud e2-micro (free tier)
 
