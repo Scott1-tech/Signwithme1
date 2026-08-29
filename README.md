@@ -227,6 +227,11 @@ behind a reverse proxy that terminates TLS (Caddy gets you a certificate
 automatically), set `FRONTEND_BIND=0.0.0.0`, and set `CORS_ORIGINS` to your real
 hostname.
 
+> **Putting it into service for the first time?** Follow
+> [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) — a staged runbook with a check at
+> the end of each step, including the template-validation stage that has to pass
+> before the system handles anything real.
+
 ### Deploying to a Google Cloud e2-micro (free tier)
 
 e2-micro is a shared-core machine with **1 GB of RAM**, so the stack is
@@ -257,6 +262,12 @@ gcloud compute ssh signwithme --zone=us-central1-a
 git clone <your repo> && cd Signwithme1
 bash scripts/gcp-setup.sh      # swap, Docker, log caps
 exit                            # log back in for the docker group
+```
+
+Then verify the machine and your `.env` before starting anything:
+
+```bash
+./scripts/preflight.sh
 ```
 
 Swap is not optional. With 1 GB and no swap the frontend image build is killed
