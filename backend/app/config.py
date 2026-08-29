@@ -28,11 +28,17 @@ class Settings(BaseSettings):
 
     # Auth
     jwt_secret: str = "change-me-in-production"
+    # Separate key for encrypting stored PII. Falls back to jwt_secret when unset.
+    pii_encryption_key: str | None = None
     jwt_algorithm: str = "HS256"
     access_token_ttl_minutes: int = 60 * 8
 
     # Uploads
     max_upload_bytes: int = 50 * 1024 * 1024
+
+    # Login throttling
+    login_max_attempts: int = 8
+    login_lockout_seconds: int = 900
 
     # CORS
     cors_origins: str = "http://localhost:3000,http://localhost:5173"
@@ -47,9 +53,20 @@ class Settings(BaseSettings):
         return f"{scheme}://{self.minio_endpoint}"
 
 
+DEFAULT_SECRETS = {"change-me-in-production", "change-me-to-a-long-random-string", ""}
+
+
 @lru_cache
 def get_settings() -> Settings:
-    return Settings()
+    loaded = Settings()
+    # Refuse to serve real traffic signed with the example secret. In debug the
+    # default is a convenience; outside it, it is a silent authentication hole.
+    if not loaded.debug and loaded.jwt_secret in DEFAULT_SECRETS:
+        raise RuntimeError(
+            "JWT_SECRET is unset or still the example value. Generate one with: "
+            'python -c "import secrets; print(secrets.token_urlsafe(48))"'
+        )
+    return loaded
 
 
 settings = get_settings()

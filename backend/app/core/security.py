@@ -4,17 +4,21 @@ from uuid import UUID
 
 from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+import bcrypt
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.core.database import get_db
-from app.core.exceptions import AuthError, PermissionError_
+from app.core.exceptions import AuthError, PermissionError_, ValidationError
 from app.models.user import User
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 bearer_scheme = HTTPBearer(auto_error=False)
+
+# bcrypt hashes at most 72 bytes and raises on anything longer. Passwords are
+# rejected at that length in the schema rather than silently truncated here,
+# which would make two different long passwords interchangeable.
+BCRYPT_MAX_BYTES = 72
 
 ROLE_ADMIN = "admin"
 ROLE_REVIEWER = "reviewer"
@@ -22,12 +26,24 @@ ROLE_CONTRACTOR = "contractor"
 ROLE_RANK = {ROLE_CONTRACTOR: 0, ROLE_REVIEWER: 1, ROLE_ADMIN: 2}
 
 
+def _encode(raw: str) -> bytes:
+    encoded = raw.encode("utf-8")
+    if len(encoded) > BCRYPT_MAX_BYTES:
+        raise ValidationError(
+            f"Password must be {BCRYPT_MAX_BYTES} bytes or fewer once encoded"
+        )
+    return encoded
+
+
 def hash_password(raw: str) -> str:
-    return pwd_context.hash(raw)
+    return bcrypt.hashpw(_encode(raw), bcrypt.gensalt()).decode("ascii")
 
 
 def verify_password(raw: str, hashed: str) -> bool:
-    return pwd_context.verify(raw, hashed)
+    try:
+        return bcrypt.checkpw(_encode(raw), hashed.encode("ascii"))
+    except (ValueError, ValidationError):
+        return False
 
 
 def create_access_token(user: User) -> str:

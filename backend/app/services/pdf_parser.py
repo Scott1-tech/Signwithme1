@@ -71,10 +71,55 @@ def sha256_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+# A page with fewer than this many extractable characters is treated as an
+# image of a page rather than a page of text.
+MIN_CHARS_PER_TEXT_PAGE = 20
+
+
+@dataclass
+class TextLayerReport:
+    page_count: int
+    pages_without_text: list[int]
+    needs_ocr: bool
+
+    def to_dict(self) -> dict:
+        return {
+            "page_count": self.page_count,
+            "pages_without_text": self.pages_without_text,
+            "needs_ocr": self.needs_ocr,
+        }
+
+    @property
+    def message(self) -> str:
+        return (
+            f"{len(self.pages_without_text)} of {self.page_count} pages contain no extractable "
+            "text, so this file is a scan rather than a digital PDF. Run OCR on it "
+            "(for example `ocrmypdf in.pdf out.pdf`) and upload the searchable version."
+        )
+
+
 class PdfParser:
     def page_count(self, pdf_path: str) -> int:
         with pdfplumber.open(pdf_path) as pdf:
             return len(pdf.pages)
+
+    def analyze_text_layer(self, pdf_path: str) -> TextLayerReport:
+        """Distinguish a digital PDF from a scan.
+
+        Without this check a scanned contract extracts nothing and is reported
+        as 100% of fields missing -- which looks like a broken comparison
+        rather than a document that needs OCR first.
+        """
+        empty: list[int] = []
+        with pdfplumber.open(pdf_path) as pdf:
+            total = len(pdf.pages)
+            for number, page in enumerate(pdf.pages, start=1):
+                if len(page.chars) < MIN_CHARS_PER_TEXT_PAGE:
+                    empty.append(number)
+        # Tolerate a few genuinely blank or image-only pages in an otherwise
+        # digital document; flag the file only when most of it is unreadable.
+        needs_ocr = total > 0 and len(empty) > total / 2
+        return TextLayerReport(page_count=total, pages_without_text=empty, needs_ocr=needs_ocr)
 
     def extract(self, pdf_path: str, field_schema: dict) -> dict[str, dict]:
         """Return {field_id: extracted-dict} for every field in the schema."""

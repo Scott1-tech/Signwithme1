@@ -2,11 +2,10 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import DateTime, ForeignKey, Index, String, func
-from sqlalchemy.dialects.postgresql import INET, JSONB
-from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, uuid_pk
+from app.models.types import INETType, JSONType, UUIDType
 
 
 class AuditLog(Base):
@@ -21,20 +20,20 @@ class AuditLog(Base):
 
     id: Mapped[uuid.UUID] = uuid_pk()
     contract_id: Mapped[uuid.UUID | None] = mapped_column(
-        PGUUID(as_uuid=True), ForeignKey("contracts.id", ondelete="SET NULL")
+        UUIDType, ForeignKey("contracts.id", ondelete="SET NULL")
     )
     template_id: Mapped[uuid.UUID | None] = mapped_column(
-        PGUUID(as_uuid=True), ForeignKey("templates.id", ondelete="SET NULL")
+        UUIDType, ForeignKey("templates.id", ondelete="SET NULL")
     )
 
     action: Mapped[str] = mapped_column(String(100), nullable=False)
 
-    actor_id: Mapped[uuid.UUID | None] = mapped_column(PGUUID(as_uuid=True))
+    actor_id: Mapped[uuid.UUID | None] = mapped_column(UUIDType)
     actor_email: Mapped[str | None] = mapped_column(String(255))
     actor_role: Mapped[str | None] = mapped_column(String(50))
 
-    details: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
-    ip_address: Mapped[str | None] = mapped_column(INET)
+    details: Mapped[dict] = mapped_column(JSONType, default=dict, nullable=False)
+    ip_address: Mapped[str | None] = mapped_column(INETType)
     user_agent: Mapped[str | None] = mapped_column(String(500))
 
     timestamp: Mapped[datetime] = mapped_column(

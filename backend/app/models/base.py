@@ -3,8 +3,9 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import DateTime, func
-from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
+from app.models.types import UUIDType
 
 
 class Base(DeclarativeBase):
@@ -12,7 +13,7 @@ class Base(DeclarativeBase):
 
 
 def uuid_pk() -> Mapped[uuid.UUID]:
-    return mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    return mapped_column(UUIDType, primary_key=True, default=uuid.uuid4)
 
 
 def created_at_col() -> Mapped[datetime]:

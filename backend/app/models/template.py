@@ -2,11 +2,10 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import ForeignKey, Integer, String, Text
-from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, created_at_col, updated_at_col, uuid_pk
+from app.models.types import JSONType, UUIDType
 
 TEMPLATE_STATUSES = ("processing", "ready", "failed", "archived")
 
@@ -22,13 +21,13 @@ class Template(Base):
     page_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
     # Full detected structure: {"pages": [{"page_number": 1, "fields": [...]}]}
-    field_schema: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
+    field_schema: Mapped[dict] = mapped_column(JSONType, default=dict, nullable=False)
 
     status: Mapped[str] = mapped_column(String(50), default="processing", nullable=False)
     error_message: Mapped[str | None] = mapped_column(Text)
 
     created_by: Mapped[uuid.UUID] = mapped_column(
-        PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+        UUIDType, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
     )
     created_at: Mapped[datetime] = created_at_col()
     updated_at: Mapped[datetime] = updated_at_col()

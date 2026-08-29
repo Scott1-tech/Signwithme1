@@ -19,17 +19,43 @@ canvas, and rendered into a final PDF with a full audit trail.
 ## Running it
 
 ```bash
-cp .env.example .env      # then edit the passwords and JWT secret
-docker compose up --build
+cp .env.example .env
+python -c "import secrets; print(secrets.token_urlsafe(48))"   # JWT_SECRET
+python -c "import secrets; print(secrets.token_urlsafe(48))"   # PII_ENCRYPTION_KEY
+docker compose up --build -d
 ```
 
 * Frontend — http://localhost:3000
-* API docs — http://localhost:8000/docs
 * MinIO console — http://localhost:9001
 
-Migrations run automatically before the API starts. If `SEED_ADMIN_EMAIL` and
-`SEED_ADMIN_PASSWORD` are set, an admin account is created on first boot —
-self-registration only ever produces contractors.
+`docker-compose.yml` is the **production** configuration: no source mounts, no
+reload, restart policies on, and every port bound to loopback. The API and the
+UI are reached through the frontend container, which proxies `/api`. For local
+development add the override:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+```
+
+Migrations run automatically before the API starts — only in the API container,
+so the worker cannot race it. If `SEED_ADMIN_EMAIL` and `SEED_ADMIN_PASSWORD`
+are set, an admin account is created on first boot; self-registration only ever
+produces contractors.
+
+The app **refuses to start** outside debug mode if `JWT_SECRET` is missing or
+still the example value.
+
+### Backups
+
+```bash
+./scripts/backup.sh          # writes ./backups/<timestamp>/
+```
+
+Dumps Postgres and mirrors the object store together — one without the other
+restores to a broken system. The encryption key is deliberately **not** included:
+a backup holding both the ciphertext and its key is just plaintext in a tarball.
+Store `PII_ENCRYPTION_KEY` somewhere else, and do not lose it — without it the
+stored SSN and EIN values cannot be read back.
 
 ### Local development without Docker
 
@@ -48,9 +74,16 @@ npm run dev
 ### Tests
 
 ```bash
-cd backend && python -m pytest -q      # 47 tests
-cd frontend && npm run typecheck
+cd backend && python -m pytest -q      # 80 tests
+cd frontend && npm run typecheck && npm run build
 ```
+
+The suite includes full API tests — auth, RBAC, uploads, the signing gate, PII
+handling, finalisation and download — running against SQLite with in-memory
+object storage and inline Celery, so no external services are needed. That is
+why the models use dialect-portable column types; production is still
+PostgreSQL with JSONB. GitHub Actions runs all of this plus both image builds
+on every push.
 
 ## The flow
 
@@ -127,6 +160,24 @@ own bounding box rather than offsetting a fixed number of points from the
 signature, and renders `MM/DD/YYYY` — the format the contract prints — rather
 than the ISO value the date input submits.
 
+### Sensitive values never sit in plaintext
+
+SSNs, EINs and dates of birth are recognised by field id and encrypted (Fernet)
+before they reach the database. They are masked in every API response
+(`XXX-XX-6789`), masked in the cached extract, masked in the comparison result,
+and scrubbed from the audit log — correcting a misread SSN would otherwise write
+both the old and the new value into an append-only table, permanently. An admin
+can decrypt one value through `GET /api/contracts/{id}/fields/{field_id}/reveal`,
+which is itself an audited event. Reading an SSN is a deliberate act with a
+record attached, not a side effect of opening a contract.
+
+### Scans are identified, not silently failed
+
+A scanned PDF has no text layer, so every field extracts as empty and the
+comparison reports 100% missing — technically true and completely misleading.
+The parser checks the text layer first and fails the document with an explicit
+"this is a scan, run OCR on it" message instead.
+
 ### Integrity and access
 
 Every artefact (template, upload, signature image, final PDF) lives in object
@@ -149,16 +200,55 @@ documents contain SSNs and licence numbers.
 * `updated_at` is maintained by an ORM hook and by a database trigger, so direct
   SQL writes stay honest.
 
+## Deploying it privately
+
+This app is built for a single operator handling their own driver files. It is
+**not** designed to be exposed to the open internet, and nothing in it assumes a
+public audience.
+
+Recommended shape:
+
+1. Run `docker compose up -d` on a machine you control.
+2. Leave `FRONTEND_BIND=127.0.0.1` so nothing listens on a public interface.
+3. Reach it over a private network — Tailscale or WireGuard — from your laptop
+   or phone.
+
+That gives encrypted transport, device-level authentication and zero public
+attack surface, with no certificate to manage. If you do publish it, put it
+behind a reverse proxy that terminates TLS (Caddy gets you a certificate
+automatically), set `FRONTEND_BIND=0.0.0.0`, and set `CORS_ORIGINS` to your real
+hostname.
+
+### Known limits of this deployment
+
+* **Login throttling is per process.** Adequate for a single instance; it does
+  not coordinate across replicas.
+* **JWTs cannot be revoked** before they expire (8 hours by default). There is
+  no password reset flow; an admin changes a password via the database.
+* **No automatic backups.** `scripts/backup.sh` exists but nothing schedules it
+  — add a cron entry.
+* **`docker compose` was never executed in the environment this was built in**,
+  so the composition is validated by review and by CI image builds, not by a
+  live run. Expect to shake out one or two environment issues on first boot.
+
 ## Not yet built
 
 * **`ai-service`** — the optional ML field detector for scanned PDFs from the
   original architecture. Not implemented, and deliberately absent from
   `docker-compose.yml` rather than declared as a service that would fail to
-  build. The current parser handles digital PDFs; scanned documents need OCR
-  (pytesseract) wired into `PdfParser`.
+  build. Scanned documents are now *detected and reported* rather than silently
+  mis-parsed; making them readable still needs OCR (`ocrmypdf` on the file
+  beforehand, or pytesseract wired into `PdfParser`).
 * **Cryptographic PDF signing.** Signatures are drawn images overlaid on the
   document, with SHA-256 hashes and a full audit trail for evidentiary value.
   PKI-backed digital signatures (PAdES) are a separate piece of work.
+* **Detection accuracy on your real template is still unmeasured.** The detector
+  has only ever been run against synthetic PDFs. Upload the real document, walk
+  every page in the Template Manager, and correct the boxes that are wrong.
+  The cross-field and FMCSA rules reference field ids the detector is *expected*
+  to produce; a rule whose fields are absent is skipped rather than failed, so a
+  mis-specified rule fails open — re-point them at real ids and verify with a
+  deliberately non-compliant contract.
 
 ## Layout
 

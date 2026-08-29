@@ -5,6 +5,7 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
+from app.core.pii import redact_audit_details
 from app.models.audit import AuditLog
 from app.models.user import User
 
@@ -16,6 +17,7 @@ CONTRACT_UPLOADED = "contract_uploaded"
 CONTRACT_PARSED = "contract_parsed"
 COMPARISON_RUN = "comparison_run"
 FIELD_CORRECTED = "field_corrected"
+FIELD_REVEALED = "field_revealed"
 REVIEW_SUBMITTED = "review_submitted"
 SIGNATURE_ADDED = "signature_added"
 SIGNATURE_REMOVED = "signature_removed"
@@ -43,7 +45,9 @@ def log(
         actor_id=actor.id if actor else None,
         actor_email=actor.email if actor else None,
         actor_role=actor.role if actor else None,
-        details=details or {},
+        # A field correction carries the old and new value; for a sensitive
+        # field those must never land in an append-only table.
+        details=redact_audit_details(details or {}),
         ip_address=ip_address,
         user_agent=(user_agent or "")[:500] or None,
     )

@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field as dc_field
 
+from app.core import pii
 from app.services import validators as v
 
 SEVERITY_CRITICAL = "critical"
@@ -222,6 +223,10 @@ class ComparisonEngine:
         value = extracted.get("value")
         if v.is_blank(value):
             return None
+        if extracted.get("redacted"):
+            # Re-running the comparison reads the masked cache; format-checking
+            # 'XXX-XX-6789' would invent a warning that is not real.
+            return None
 
         field_id = field["field_id"]
         field_type = field.get("field_type", "text_line")
@@ -244,7 +249,7 @@ class ComparisonEngine:
             "type": f"invalid_{field_id}",
             "field_id": field_id,
             "issue": error,
-            "values": {field_id: value},
+            "values": {field_id: pii.mask(value, field_id)},
             "pages": [field.get("page")],
             "severity": SEVERITY_WARNING,
         }
@@ -280,7 +285,7 @@ class ComparisonEngine:
                     {
                         "type": rule.type,
                         "issue": rule.issue,
-                        "values": present,
+                        "values": pii.redact_mapping(present),
                         # Explicit pages so the review UI can filter without
                         # parsing field-id prefixes.
                         "pages": sorted(

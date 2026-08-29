@@ -13,9 +13,16 @@ from app.api.deps import (
     get_template_or_404,
     read_pdf_upload,
 )
+from app.core import pii
 from app.core.database import get_db
 from app.core.exceptions import ConflictError
-from app.core.security import ROLE_ADMIN, ROLE_REVIEWER, client_ip, get_current_user
+from app.core.security import (
+    ROLE_ADMIN,
+    ROLE_REVIEWER,
+    client_ip,
+    get_current_user,
+    require_role,
+)
 from app.models.contract import Contract
 from app.models.field import ContractField
 from app.models.user import User
@@ -35,6 +42,20 @@ from app.services.template_mapper import extracted_cache, normalized_for
 from app.workers.tasks import process_contract_task
 
 router = APIRouter(prefix="/api/contracts", tags=["contracts"])
+
+
+def _field_out(row: ContractField) -> ContractFieldOut:
+    """Serialise a field row with sensitive values masked.
+
+    Stored sensitive values are ciphertext, so returning them raw would be
+    useless as well as unsafe; the plaintext is available only through the
+    audited reveal endpoint below.
+    """
+    out = ContractFieldOut.model_validate(row)
+    if pii.is_sensitive(row.template_field_id):
+        out.raw_value = pii.mask(pii.decrypt(row.raw_value), row.template_field_id)
+        out.normalized_value = None
+    return out
 
 
 @router.post("", response_model=ContractCreateResponse, status_code=202)
@@ -170,7 +191,7 @@ def list_contract_fields(
     query = select(ContractField).where(ContractField.contract_id == contract.id)
     if page is not None:
         query = query.where(ContractField.page_number == page)
-    return list(db.scalars(query.order_by(ContractField.page_number)))
+    return [_field_out(row) for row in db.scalars(query.order_by(ContractField.page_number))]
 
 
 @router.patch("/{contract_id}/fields/{field_id}", response_model=ContractFieldOut)
@@ -195,11 +216,13 @@ def correct_field(
     if row is None:
         raise ConflictError(f"Field {field_id} does not exist on this contract")
 
-    previous = row.raw_value
+    sensitive = pii.is_sensitive(field_id)
+    previous = pii.decrypt(row.raw_value) if sensitive else row.raw_value
     patch = correction.model_dump(exclude_unset=True)
     if "value" in patch:
-        row.raw_value = patch["value"]
-        row.normalized_value = normalized_for(row.field_type, field_id, patch["value"])
+        normalized = normalized_for(row.field_type, field_id, patch["value"])
+        row.raw_value = pii.encrypt(patch["value"]) if sensitive else patch["value"]
+        row.normalized_value = pii.encrypt(normalized) if sensitive else normalized
     if "selected" in patch and patch["selected"] is not None:
         row.extra = {**(row.extra or {}), "selected": patch["selected"]}
     if "checked" in patch and patch["checked"] is not None:
@@ -219,13 +242,58 @@ def correct_field(
         audit.FIELD_CORRECTED,
         contract_id=contract.id,
         actor=user,
-        details={"field_id": field_id, "from": previous, "to": row.raw_value},
+        # audit.log scrubs these for a sensitive field before they are written.
+        details={
+            "field_id": field_id,
+            "from": previous,
+            "to": patch.get("value", previous),
+        },
         ip_address=client_ip(request),
         user_agent=request.headers.get("user-agent"),
     )
     db.commit()
     db.refresh(row)
-    return row
+    return _field_out(row)
+
+
+@router.get("/{contract_id}/fields/{field_id}/reveal")
+def reveal_field(
+    contract_id: UUID,
+    field_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_role(ROLE_ADMIN)),
+):
+    """Decrypt one sensitive value. Admin only, and always audited.
+
+    Reading an SSN is a deliberate act with a record attached, rather than a
+    side effect of opening the contract.
+    """
+    contract = get_contract_or_404(db, contract_id)
+    row = db.scalar(
+        select(ContractField).where(
+            ContractField.contract_id == contract.id,
+            ContractField.template_field_id == field_id,
+        )
+    )
+    if row is None:
+        raise ConflictError(f"Field {field_id} does not exist on this contract")
+
+    audit.log(
+        db,
+        audit.FIELD_REVEALED,
+        contract_id=contract.id,
+        actor=user,
+        details={"field_id": field_id},
+        ip_address=client_ip(request),
+        user_agent=request.headers.get("user-agent"),
+        commit=True,
+    )
+    return {
+        "field_id": field_id,
+        "value": pii.decrypt(row.raw_value),
+        "sensitive": pii.is_sensitive(field_id),
+    }
 
 
 @router.get("/{contract_id}/file")

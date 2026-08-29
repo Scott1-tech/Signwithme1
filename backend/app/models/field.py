@@ -2,11 +2,10 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import Boolean, ForeignKey, Index, Integer, Numeric, String, Text, UniqueConstraint
-from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, created_at_col, uuid_pk
+from app.models.types import JSONType, UUIDType
 
 FIELD_STATUSES = ("empty", "filled", "invalid", "verified")
 
@@ -25,7 +24,7 @@ class ContractField(Base):
 
     id: Mapped[uuid.UUID] = uuid_pk()
     contract_id: Mapped[uuid.UUID] = mapped_column(
-        PGUUID(as_uuid=True), ForeignKey("contracts.id", ondelete="CASCADE"), nullable=False
+        UUIDType, ForeignKey("contracts.id", ondelete="CASCADE"), nullable=False
     )
     template_field_id: Mapped[str] = mapped_column(String(100), nullable=False)
 
@@ -41,11 +40,11 @@ class ContractField(Base):
     validation_error: Mapped[str | None] = mapped_column(Text)
 
     # Canonical bbox: {"x", "y", "width", "height"} in PDF points, top-left origin.
-    bbox: Mapped[dict | None] = mapped_column(JSONB)
+    bbox: Mapped[dict | None] = mapped_column(JSONType)
     page_number: Mapped[int | None] = mapped_column(Integer)
 
     # Type-specific payload: checkbox selections, table rows, signature detection.
-    extra: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
+    extra: Mapped[dict] = mapped_column(JSONType, default=dict, nullable=False)
 
     created_at: Mapped[datetime] = created_at_col()
 

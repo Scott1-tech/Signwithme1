@@ -11,6 +11,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core import pii
 from app.models.field import ContractField
 from app.services import validators as v
 from app.services.comparison_engine import _index_schema
@@ -80,8 +81,15 @@ def sync_contract_fields(
 
         row.field_type = field_type
         row.status = status
-        row.raw_value = None if raw_value is None else str(raw_value)
-        row.normalized_value = normalized_for(field_type, field_id, raw_value)
+        normalized = normalized_for(field_type, field_id, raw_value)
+        stored_raw = None if raw_value is None else str(raw_value)
+        if pii.is_sensitive(field_id):
+            # SSNs, EINs and dates of birth are encrypted before they touch the
+            # database; only an explicit admin reveal decrypts them again.
+            stored_raw = pii.encrypt(stored_raw)
+            normalized = pii.encrypt(normalized)
+        row.raw_value = stored_raw
+        row.normalized_value = normalized
         row.confidence_score = data.get("confidence")
         row.is_required = bool(field.get("required", False))
         row.is_valid = None if not filled else error is None
@@ -103,9 +111,20 @@ def extracted_cache(rows: list[ContractField]) -> dict[str, dict]:
     """Rebuild contracts.extracted_data from the authoritative field rows."""
     cache: dict[str, dict] = {}
     for row in rows:
+        sensitive = pii.is_sensitive(row.template_field_id)
+        # The cache is a display artefact and is read back by the comparison
+        # re-run, so it holds a masked value -- never the plaintext, never the
+        # ciphertext.
+        display = (
+            pii.mask(pii.decrypt(row.raw_value), row.template_field_id)
+            if sensitive
+            else row.raw_value
+        )
         entry: dict = {
-            "value": row.raw_value,
-            "normalized": row.normalized_value,
+            "value": display,
+            "normalized": None if sensitive else row.normalized_value,
+            "sensitive": sensitive,
+            "redacted": sensitive,
             "confidence": float(row.confidence_score) if row.confidence_score is not None else 0.0,
             "detected": row.status in ("filled", "verified"),
             "status": row.status,

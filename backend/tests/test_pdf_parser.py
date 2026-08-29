@@ -44,3 +44,34 @@ def test_unsigned_signature_region_is_not_reported_as_signed(blank_template_path
 def test_hash_is_stable():
     assert sha256_bytes(b"abc") == sha256_bytes(b"abc")
     assert sha256_bytes(b"abc") != sha256_bytes(b"abd")
+
+
+def test_a_digital_pdf_is_not_flagged_for_ocr(filled_contract_path):
+    report = PdfParser().analyze_text_layer(filled_contract_path)
+    assert report.needs_ocr is False
+    assert report.pages_without_text == []
+
+
+def test_a_scanned_pdf_is_identified_rather_than_reported_as_empty(tmp_path):
+    """A scan extracts no text. Without this check every field reads as missing,
+    which looks like a broken comparison instead of a file that needs OCR."""
+    import io
+
+    from PIL import Image
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib.utils import ImageReader
+    from reportlab.pdfgen import canvas
+
+    picture = Image.new("RGB", (1200, 1600), "white")
+    buffer = io.BytesIO()
+    picture.save(buffer, format="PNG")
+
+    path = tmp_path / "scan.pdf"
+    pdf = canvas.Canvas(str(path), pagesize=letter)
+    pdf.drawImage(ImageReader(io.BytesIO(buffer.getvalue())), 0, 0, width=612, height=792)
+    pdf.showPage()
+    pdf.save()
+
+    report = PdfParser().analyze_text_layer(str(path))
+    assert report.needs_ocr is True
+    assert "OCR" in report.message

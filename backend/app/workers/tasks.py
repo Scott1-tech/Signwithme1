@@ -32,6 +32,18 @@ def analyze_template_task(self, template_id: str) -> dict:
         db.commit()
 
         with storage.local_copy(template.file_path) as path:
+            text_layer = PdfParser().analyze_text_layer(path)
+            if text_layer.needs_ocr:
+                template.status = "failed"
+                template.error_message = text_layer.message
+                audit.log(
+                    db,
+                    audit.TEMPLATE_ANALYZED,
+                    template_id=template.id,
+                    details={"needs_ocr": True, **text_layer.to_dict()},
+                )
+                db.commit()
+                return {"status": "failed", "needs_ocr": True}
             schema = FieldDetector().build_schema(path)
 
         template.field_schema = schema
@@ -81,8 +93,24 @@ def process_contract_task(self, contract_id: str) -> dict:
         contract.status = "parsing"
         db.commit()
 
+        parser = PdfParser()
         with storage.local_copy(contract.file_path) as path:
-            extracted = PdfParser().extract(path, template.field_schema)
+            text_layer = parser.analyze_text_layer(path)
+            if text_layer.needs_ocr:
+                # Reporting every field as missing would be technically true and
+                # completely misleading; say what is actually wrong.
+                contract.status = "failed"
+                contract.error_message = text_layer.message
+                audit.log(
+                    db,
+                    audit.CONTRACT_PARSED,
+                    contract_id=contract.id,
+                    template_id=template.id,
+                    details={"needs_ocr": True, **text_layer.to_dict()},
+                )
+                db.commit()
+                return {"status": "failed", "needs_ocr": True}
+            extracted = parser.extract(path, template.field_schema)
 
         comparison = ComparisonEngine().compare(
             extracted, template.field_schema, contract_id=str(contract.id)

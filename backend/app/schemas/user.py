@@ -7,7 +7,9 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 class UserCreate(BaseModel):
     email: EmailStr
-    password: str = Field(min_length=8, max_length=128)
+    # bcrypt's hard limit; longer input would have to be truncated, making
+    # distinct passwords equivalent.
+    password: str = Field(min_length=8, max_length=72)
     full_name: str | None = None
     role: str = "contractor"
 

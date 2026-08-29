@@ -1,19 +1,26 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.exceptions import AuthError, ConflictError
+from app.core.exceptions import AppError, AuthError, ConflictError
 from app.core.security import (
     ROLE_ADMIN,
+    client_ip,
     ROLE_RANK,
     create_access_token,
     get_current_user,
     hash_password,
     verify_password,
 )
+from app.core.throttle import login_throttle
 from app.models.user import User
 from app.schemas.user import TokenOut, UserCreate, UserLogin, UserOut
+
+
+class TooManyAttempts(AppError):
+    status_code = 429
+    code = "too_many_attempts"
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -39,12 +46,26 @@ def register(payload: UserCreate, db: Session = Depends(get_db)):
 
 
 @router.post("/login", response_model=TokenOut)
-def login(payload: UserLogin, db: Session = Depends(get_db)):
+def login(payload: UserLogin, request: Request, db: Session = Depends(get_db)):
+    # Throttled per email and source address: an exposed login form is the one
+    # endpoint an attacker can hammer without any credentials at all.
+    throttle_key = f"{payload.email.lower()}|{client_ip(request) or 'unknown'}"
+    locked_for = login_throttle.is_locked(throttle_key)
+    if locked_for:
+        raise TooManyAttempts(
+            f"Too many failed sign-in attempts. Try again in {locked_for} seconds."
+        )
+
     user = db.scalar(select(User).where(User.email == payload.email.lower()))
     if user is None or not verify_password(payload.password, user.password_hash):
+        login_throttle.record_failure(throttle_key)
+        # One message for both cases: distinguishing them confirms which emails
+        # have accounts.
         raise AuthError("Incorrect email or password")
     if not user.is_active:
         raise AuthError("Account is disabled")
+
+    login_throttle.reset(throttle_key)
     return TokenOut(access_token=create_access_token(user), user=UserOut.model_validate(user))
 
 
