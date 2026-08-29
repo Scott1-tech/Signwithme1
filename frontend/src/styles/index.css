@@ -1,0 +1,201 @@
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --border: #d9dee5;
+  --text: #16202c;
+  --muted: #5c6b7a;
+  --accent: #1f6feb;
+  --good: #1a7f4b;
+  --good-bg: #e7f6ed;
+  --warn: #9a6700;
+  --warn-bg: #fff6e0;
+  --bad: #b42318;
+  --bad-bg: #fdeceb;
+  --radius: 8px;
+  color-scheme: light;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
+
+code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+
+/* --- shell --------------------------------------------------------------- */
+.app { min-height: 100vh; display: flex; flex-direction: column; }
+
+.app__header {
+  display: flex; align-items: center; gap: 24px;
+  padding: 12px 20px; background: var(--surface); border-bottom: 1px solid var(--border);
+}
+.app__brand { font-weight: 700; text-decoration: none; color: var(--text); }
+.app__nav { display: flex; gap: 16px; }
+.app__nav a { color: var(--muted); text-decoration: none; padding: 4px 0; }
+.app__nav a.active { color: var(--accent); border-bottom: 2px solid var(--accent); }
+.app__user { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+.app__user-name em { color: var(--muted); font-style: normal; font-size: 12px; }
+.app__main { flex: 1; min-height: 0; }
+
+.page { max-width: 1100px; margin: 0 auto; padding: 24px 20px; }
+.page__header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
+.page__header h1 { font-size: 22px; margin: 0; }
+
+.card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 16px; margin-bottom: 16px;
+}
+.card h2 { margin: 0 0 8px; font-size: 16px; }
+
+.empty, .hint { color: var(--muted); font-size: 13px; }
+.hint--error { color: var(--bad); }
+
+.alert { padding: 10px 12px; border-radius: var(--radius); font-size: 13px; }
+.alert--error { background: var(--bad-bg); color: var(--bad); border: 1px solid #f3c2bd; }
+
+/* --- forms --------------------------------------------------------------- */
+.field { display: block; margin-bottom: 12px; }
+.field span { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+.field input, .field select, .field__textarea {
+  width: 100%; padding: 8px 10px; border: 1px solid var(--border);
+  border-radius: 6px; font: inherit; background: var(--surface); color: var(--text);
+}
+.field__textarea { min-height: 72px; resize: vertical; }
+
+.button {
+  border: 1px solid var(--border); background: var(--surface); color: var(--text);
+  padding: 8px 14px; border-radius: 6px; font: inherit; cursor: pointer;
+}
+.button:disabled { opacity: 0.5; cursor: not-allowed; }
+.button--primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.button--ghost { background: transparent; }
+.button--link { border: none; background: none; color: var(--accent); padding: 0; }
+.button--block { width: 100%; }
+
+/* --- tables -------------------------------------------------------------- */
+.table { width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
+.table th, .table td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.table th { font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+.table tr:last-child td { border-bottom: none; }
+.table--compact th, .table--compact td { padding: 6px 8px; font-size: 13px; }
+.table__actions { display: flex; gap: 12px; }
+
+.list { list-style: none; margin: 0; padding: 0; }
+.list__item { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.list__item:last-child { border-bottom: none; }
+
+/* --- badges and progress ------------------------------------------------- */
+.badge { display: inline-block; padding: 3px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+.badge--good { background: var(--good-bg); color: var(--good); }
+.badge--warn { background: var(--warn-bg); color: var(--warn); }
+.badge--bad { background: var(--bad-bg); color: var(--bad); }
+.badge--neutral { background: #eceff3; color: var(--muted); }
+
+.progress__header { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px; }
+.progress__track { height: 8px; background: #e6eaee; border-radius: 999px; overflow: hidden; }
+.progress__fill { height: 100%; }
+.progress__fill--good { background: var(--good); }
+.progress__fill--warn { background: #d9a441; }
+.progress__fill--bad { background: var(--bad); }
+
+/* --- review layout ------------------------------------------------------- */
+.review { display: flex; height: calc(100vh - 57px); }
+.review__document { flex: 2; min-width: 0; overflow: auto; padding: 12px; }
+.review__panel { flex: 0 0 380px; min-width: 320px; border-left: 1px solid var(--border); background: var(--surface); overflow-y: auto; padding: 12px; }
+.review__actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
+
+/* --- pdf viewer ---------------------------------------------------------- */
+.pdf-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.pdf-toolbar__spacer { flex: 1; }
+.pdf-toolbar__page, .pdf-toolbar__zoom { font-size: 13px; color: var(--muted); }
+.pdf-toolbar button { border: 1px solid var(--border); background: var(--surface); border-radius: 6px; padding: 4px 10px; cursor: pointer; }
+
+.pdf-stage { display: flex; justify-content: center; }
+.pdf-status { color: var(--muted); }
+.pdf-status--error { color: var(--bad); }
+
+/* The overlay is positioned against this box, so it must match the canvas
+   exactly -- any padding here would offset every highlight. */
+.pdf-page { position: relative; box-shadow: 0 1px 6px rgba(16, 24, 40, 0.16); background: #fff; }
+.pdf-page--interactive { cursor: crosshair; }
+.pdf-canvas { display: block; }
+.pdf-overlay { position: absolute; inset: 0; pointer-events: none; }
+.pdf-overlay > * { pointer-events: auto; }
+
+/* --- highlights ---------------------------------------------------------- */
+.highlight {
+  position: absolute; border-radius: 3px; border: 2px solid; background: transparent;
+  cursor: pointer; padding: 0;
+}
+.highlight--critical { border-color: rgba(180, 35, 24, 0.9); background: rgba(180, 35, 24, 0.12); }
+.highlight--warning { border-color: rgba(154, 103, 0, 0.9); background: rgba(217, 164, 65, 0.14); }
+.highlight--active { outline: 2px solid var(--accent); outline-offset: 2px; }
+.highlight__label {
+  position: absolute; top: -18px; left: 0; white-space: nowrap;
+  font-size: 10px; background: var(--text); color: #fff; padding: 1px 4px; border-radius: 3px;
+}
+
+.slot {
+  position: absolute; border: 2px dashed var(--accent); background: rgba(31, 111, 235, 0.08);
+  border-radius: 3px; cursor: pointer; padding: 0;
+}
+.slot--filled { border-style: solid; border-color: var(--good); background: rgba(26, 127, 75, 0.12); cursor: default; }
+.slot__label { font-size: 10px; color: var(--accent); }
+.slot--filled .slot__label { color: var(--good); }
+
+.placed-signature { position: absolute; border-bottom: 2px solid var(--good); pointer-events: none; }
+
+/* --- sidebar ------------------------------------------------------------- */
+.sidebar__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.sidebar__header h2 { font-size: 16px; margin: 0; }
+.sidebar__summary { margin-bottom: 12px; }
+.sidebar__counts { font-size: 12px; color: var(--muted); margin: 4px 0 0; }
+.sidebar__scope { display: flex; gap: 8px; margin-bottom: 12px; }
+.sidebar__group { margin-bottom: 16px; }
+.sidebar__group-title { font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin: 0 0 6px; }
+.sidebar__group-count { color: var(--text); }
+.sidebar__empty { color: var(--muted); font-size: 13px; }
+
+.chip { border: 1px solid var(--border); background: var(--surface); border-radius: 999px; padding: 4px 10px; font-size: 12px; cursor: pointer; }
+.chip--active { border-color: var(--accent); color: var(--accent); }
+
+.issue-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.issue {
+  display: block; width: 100%; text-align: left; cursor: pointer;
+  border: 1px solid var(--border); border-left: 3px solid var(--border);
+  border-radius: 6px; padding: 8px 10px; background: var(--surface);
+}
+.issue--critical { border-left-color: var(--bad); }
+.issue--warning { border-left-color: #d9a441; }
+.issue--active { outline: 2px solid var(--accent); }
+.issue__label { display: block; font-weight: 600; font-size: 13px; }
+.issue__detail { display: block; font-size: 12px; color: var(--muted); }
+.issue__meta { display: block; font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+/* --- modal / signature pad ---------------------------------------------- */
+.modal { position: fixed; inset: 0; background: rgba(16, 24, 40, 0.5); display: flex; align-items: center; justify-content: center; z-index: 50; }
+.modal__panel { background: var(--surface); border-radius: var(--radius); padding: 20px; width: min(560px, 92vw); }
+.modal__title { margin: 0 0 4px; font-size: 18px; }
+.modal__hint { color: var(--muted); font-size: 13px; margin: 0 0 12px; }
+.modal__actions { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+.modal__spacer { flex: 1; }
+
+.signature-pad { position: relative; border: 1px solid var(--border); border-radius: 6px; background: #fff; display: inline-block; }
+.signature-pad__canvas { display: block; touch-action: none; cursor: crosshair; }
+.signature-pad__baseline { position: absolute; left: 24px; right: 24px; bottom: 34px; border-bottom: 1px dashed var(--border); }
+
+/* --- date picker --------------------------------------------------------- */
+.date-picker { display: block; }
+.date-picker__label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+.date-picker__input { padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font: inherit; }
+.date-picker__preview { display: block; font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+/* --- auth ---------------------------------------------------------------- */
+.auth { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+.auth__card { width: min(400px, 100%); }
+.auth__card h1 { font-size: 20px; margin: 0 0 16px; }
+.auth__card .button { width: 100%; margin-bottom: 8px; }
